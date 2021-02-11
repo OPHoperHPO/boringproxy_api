@@ -54,7 +54,7 @@ class Tunnel(SSHTunnelForwarder):
     def start(self):
         """Registers a tunnel with a boring proxy api and starts an ssh tunnel"""
         tunnel_info = self.__register_tunnel__()
-        ssh_pkey = PKey().from_private_key(StringIO(tunnel_info["tunnel_private_key"]))
+        ssh_pkey = RSAKey.from_private_key(StringIO(tunnel_info["tunnel_private_key"]))
         super().__init__(ssh_address_or_host=tunnel_info["server_address"],
                          ssh_port=tunnel_info["server_port"],
                          ssh_username=tunnel_info["username"],
