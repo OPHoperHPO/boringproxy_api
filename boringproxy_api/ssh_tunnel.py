@@ -32,8 +32,8 @@ class Tunnel(SSHTunnelForwarder):
                          ssh_port=tunnel_info["server_port"],
                          ssh_username=tunnel_info["username"],
                          ssh_pkey=ssh_pkey,
-                         remote_bind_address=("127.0.0.1", tunnel_info["tunnel_port"]),
-                         local_bind_address=(client_addr, client_port))
+                         remote_bind_address=("127.0.0.1", int(tunnel_info["tunnel_port"])),
+                         local_bind_address=(client_addr, int(client_port)))
 
     def __register_tunnel__(self):
         """Registers ssh tunnel in the boring proxy API server"""
@@ -59,8 +59,8 @@ class Tunnel(SSHTunnelForwarder):
                          ssh_port=tunnel_info["server_port"],
                          ssh_username=tunnel_info["username"],
                          ssh_pkey=ssh_pkey,
-                         remote_bind_address=("127.0.0.1", tunnel_info["tunnel_port"]),
-                         local_bind_address=(self.__client_addr__, self.__client_port__))
+                         remote_bind_address=("127.0.0.1", int(tunnel_info["tunnel_port"])),
+                         local_bind_address=(self.__client_addr__, int(self.__client_port__)))
         super(Tunnel, self).start()
 
     def stop(self):
