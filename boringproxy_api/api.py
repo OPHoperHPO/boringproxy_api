@@ -109,7 +109,7 @@ class WebAPI:
         """
         if '.' + self.admin_domain not in subdomain:
             subdomain = subdomain + '.' + self.admin_domain
-        params = {"admin_domain": subdomain}
+        params = {"domain": subdomain}
         params.update(kwargs)
         self.api_request("DELETE", "tunnels", params)
 
