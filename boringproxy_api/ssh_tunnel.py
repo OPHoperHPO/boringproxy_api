@@ -11,7 +11,7 @@ from .api import WebAPI
 
 
 def reverse_forward_tunnel(self, server_port, remote_host, remote_port, transport):
-    transport.request_port_forward("127.0.0.1", server_port)
+    transport.request_port_forward("", server_port)
     while True:
         if not self.is_alive:
             return
@@ -30,13 +30,8 @@ def handler(chan, host, port):
     try:
         sock.connect((host, port))
     except Exception as e:
-        print("Forwarding request to %s:%d failed: %r" % (host, port, e))
         return
 
-    print(
-        "Connected!  Tunnel open %r -> %r -> %r"
-        % (chan.origin_addr, chan.getpeername(), (host, port))
-    )
     while True:
         r, w, x = select.select([sock, chan], [], [])
         if sock in r:
@@ -51,8 +46,6 @@ def handler(chan, host, port):
             sock.send(data)
     chan.close()
     sock.close()
-    print("Tunnel closed from %r" % (chan.origin_addr,))
-
 
 
 class SSHReverseTunnelForwarder:
@@ -121,9 +114,9 @@ class Tunnel(SSHReverseTunnelForwarder):
                          port=tunnel_info["server_port"],
                          username=tunnel_info["username"],
                          pkey=ssh_pkey,
-                         server_port=client_port,
-                         remote_host="127.0.0.1",
-                         remote_port=int(tunnel_info["tunnel_port"]))
+                         server_port=int(tunnel_info["tunnel_port"]),
+                         remote_host=client_addr,
+                         remote_port=client_port)
 
     def __register_tunnel__(self):
         """Registers ssh tunnel in the boring proxy API server"""
@@ -149,9 +142,9 @@ class Tunnel(SSHReverseTunnelForwarder):
                          port=tunnel_info["server_port"],
                          username=tunnel_info["username"],
                          pkey=ssh_pkey,
-                         remote_port=int(tunnel_info["tunnel_port"]),
-                         remote_host="127.0.0.1",
-                         server_port=self.__client_port__)
+                         server_port=int(tunnel_info["tunnel_port"]),
+                         remote_host=self.__client_addr__,
+                         remote_port=self.__client_port__)
         super(Tunnel, self).start()
 
     def stop(self):
