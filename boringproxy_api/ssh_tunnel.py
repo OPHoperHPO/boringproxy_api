@@ -11,7 +11,7 @@ from .api import WebAPI
 
 
 def reverse_forward_tunnel(self, server_port, remote_host, remote_port, transport):
-    transport.request_port_forward("127.0.0.1", server_port)
+    transport.request_port_forward("", server_port)
     while True:
         if not self.is_alive:
             return
@@ -30,8 +30,13 @@ def handler(chan, host, port):
     try:
         sock.connect((host, port))
     except Exception as e:
+        print("Forwarding request to %s:%d failed: %r" % (host, port, e))
         return
 
+    print(
+        "Connected!  Tunnel open %r -> %r -> %r"
+        % (chan.origin_addr, chan.getpeername(), (host, port))
+    )
     while True:
         r, w, x = select.select([sock, chan], [], [])
         if sock in r:
@@ -46,6 +51,8 @@ def handler(chan, host, port):
             sock.send(data)
     chan.close()
     sock.close()
+    print("Tunnel closed from %r" % (chan.origin_addr,))
+
 
 
 class SSHReverseTunnelForwarder:
