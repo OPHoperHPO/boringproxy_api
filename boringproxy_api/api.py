@@ -85,7 +85,7 @@ class WebAPI:
         """
         if '.' + self.admin_domain not in subdomain:
             subdomain = subdomain + '.' + self.admin_domain
-        params = {"admin_domain": subdomain,
+        params = {"domain": subdomain,
                   "owner": self.__user__ if owner == "" else owner,
                   "ssh_key_id": ssh_key_id,
                   "client-name": client_name,
