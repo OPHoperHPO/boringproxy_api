@@ -1,11 +1,93 @@
 """Wrappers for SSHTunnel module"""
-from .api import WebAPI
-from sshtunnel import SSHTunnelForwarder
-from paramiko import RSAKey
+import select
+import socket
+import threading
 from io import StringIO
 
+import paramiko
+from paramiko import RSAKey
 
-class Tunnel(SSHTunnelForwarder):
+from .api import WebAPI
+
+
+def reverse_forward_tunnel(self, server_port, remote_host, remote_port, transport):
+    transport.request_port_forward("127.0.0.1", server_port)
+    while True:
+        if not self.is_alive:
+            return
+        chan = transport.accept(1000)
+        if chan is None:
+            continue
+        thr = threading.Thread(
+            target=handler, args=(chan, remote_host, remote_port)
+        )
+        thr.setDaemon(True)
+        thr.start()
+
+
+def handler(chan, host, port):
+    sock = socket.socket()
+    try:
+        sock.connect((host, port))
+    except Exception as e:
+        return
+
+    while True:
+        r, w, x = select.select([sock, chan], [], [])
+        if sock in r:
+            data = sock.recv(1024)
+            if len(data) == 0:
+                break
+            chan.send(data)
+        if chan in r:
+            data = chan.recv(1024)
+            if len(data) == 0:
+                break
+            sock.send(data)
+    chan.close()
+    sock.close()
+
+
+class SSHReverseTunnelForwarder:
+    """SSH -r Tunnel Forwarder"""
+
+    def __init__(self, hostname, port, username, pkey, server_port, remote_host, remote_port):
+        self.hostname = hostname
+        self.port = port
+        self.username = username
+        self.pkey = pkey
+        self.server_port = server_port
+        self.remote_host = remote_host
+        self.remote_port = remote_port
+        self.client = paramiko.SSHClient()
+        self.client.load_system_host_keys()
+        self.client.set_missing_host_key_policy(paramiko.WarningPolicy())
+        self.thread = None
+        self.is_alive = False
+
+    def start(self):
+        self.client.connect(
+            hostname=self.hostname,
+            port=self.port,
+            username=self.username,
+            pkey=self.pkey,
+            look_for_keys=False,
+        )
+        self.thread = threading.Thread(
+            target=reverse_forward_tunnel, args=(self, self.server_port, self.remote_host, self.remote_port,
+                                                 self.client.get_transport())
+        )
+        self.thread.setDaemon(True)
+        self.thread.start()
+        self.is_alive = True
+
+    def stop(self):
+        if not self.is_alive:
+            raise Exception("Nothing to stop")
+        self.is_alive = False
+
+
+class Tunnel(SSHReverseTunnelForwarder):
     """
     SSHTunnelForwarder Wrapper to communicate with Boring Proxy API server.
     """
@@ -28,12 +110,13 @@ class Tunnel(SSHTunnelForwarder):
         self.__kwargs__ = kwargs
         tunnel_info = self.__register_tunnel__()
         ssh_pkey = RSAKey.from_private_key(file_obj=StringIO(tunnel_info["tunnel_private_key"]))
-        super().__init__(ssh_address_or_host=tunnel_info["server_address"],
-                         ssh_port=tunnel_info["server_port"],
-                         ssh_username=tunnel_info["username"],
-                         ssh_pkey=ssh_pkey,
-                         remote_bind_address=("127.0.0.1", int(tunnel_info["tunnel_port"])),
-                         local_bind_address=(client_addr, int(client_port)))
+        super().__init__(hostname=tunnel_info["server_address"],
+                         port=tunnel_info["server_port"],
+                         username=tunnel_info["username"],
+                         pkey=ssh_pkey,
+                         server_port=int(tunnel_info["tunnel_port"]),
+                         remote_host=client_addr,
+                         remote_port=client_port)
 
     def __register_tunnel__(self):
         """Registers ssh tunnel in the boring proxy API server"""
@@ -55,12 +138,13 @@ class Tunnel(SSHTunnelForwarder):
         """Registers a tunnel with a boring proxy api and starts an ssh tunnel"""
         tunnel_info = self.__register_tunnel__()
         ssh_pkey = RSAKey.from_private_key(StringIO(tunnel_info["tunnel_private_key"]))
-        super().__init__(ssh_address_or_host=tunnel_info["server_address"],
-                         ssh_port=tunnel_info["server_port"],
-                         ssh_username=tunnel_info["username"],
-                         ssh_pkey=ssh_pkey,
-                         remote_bind_address=("127.0.0.1", int(tunnel_info["tunnel_port"])),
-                         local_bind_address=(self.__client_addr__, int(self.__client_port__)))
+        super().__init__(hostname=tunnel_info["server_address"],
+                         port=tunnel_info["server_port"],
+                         username=tunnel_info["username"],
+                         pkey=ssh_pkey,
+                         server_port=int(tunnel_info["tunnel_port"]),
+                         remote_host=self.__client_addr__,
+                         remote_port=self.__client_port__)
         super(Tunnel, self).start()
 
     def stop(self):
