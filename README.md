@@ -3,6 +3,7 @@
 ### 📄 Description:
 This library is used to interact with the *boringproxy* server API. \
 **It does not currently support client tls termination!**
+> Tested with boringproxy server v0.5.0
 **********************************************************************
 ### 🧷 Dependencies:
 ```requests; paramiko```
