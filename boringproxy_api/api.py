@@ -90,7 +90,7 @@ class WebAPI:
                   "ssh_key_id": ssh_key_id,
                   "client-name": client_name,
                   "client-addr": client_addr,
-                  "client_port": str(client_port),
+                  "client-port": str(client_port),
                   "allow-external-tcp": "on" if allow_external_tcp else "off",
                   "password-protect": "on" if password_protect else "off",
                   "username": username,
