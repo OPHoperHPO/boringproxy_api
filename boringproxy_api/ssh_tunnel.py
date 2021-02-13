@@ -5,27 +5,12 @@ import threading
 from io import StringIO
 
 import paramiko
-from paramiko import RSAKey
+from paramiko import RSAKey, PKey
 
 from .api import WebAPI
 
 
-def reverse_forward_tunnel(self, server_port, remote_host, remote_port, transport):
-    transport.request_port_forward("", server_port)
-    while True:
-        if not self.is_alive:
-            return
-        chan = transport.accept(1000)
-        if chan is None:
-            continue
-        thr = threading.Thread(
-            target=handler, args=(chan, remote_host, remote_port)
-        )
-        thr.setDaemon(True)
-        thr.start()
-
-
-def handler(chan, host, port):
+def handler(chan, host: int, port: int):
     sock = socket.socket()
     try:
         sock.connect((host, port))
@@ -51,7 +36,13 @@ def handler(chan, host, port):
 class SSHReverseTunnelForwarder:
     """SSH -r Tunnel Forwarder"""
 
-    def __init__(self, hostname, port, username, pkey, server_port, remote_host, remote_port):
+    def __init__(self, hostname: str, port: int, username: str,
+                 pkey: PKey, server_port: int, remote_host: str, remote_port: int):
+
+        port = int(port) if isinstance(port, str) else port
+        server_port = int(server_port) if isinstance(server_port, str) else server_port
+        remote_port = int(remote_port) if isinstance(remote_port, str) else remote_port
+
         self.hostname = hostname
         self.port = port
         self.username = username
@@ -65,6 +56,25 @@ class SSHReverseTunnelForwarder:
         self.thread = None
         self.is_alive = False
 
+    def __th_reverse_tunnel__(self):
+        server_port = self.server_port
+        remote_host = self.remote_host
+        remote_port = self.remote_port
+
+        transport = self.client.get_transport()
+        transport.request_port_forward("127.0.0.1", server_port)
+        while True:
+            if not self.is_alive:
+                return
+            chan = transport.accept(1000)
+            if chan is None:
+                continue
+            thr = threading.Thread(
+                target=handler, args=(chan, remote_host, remote_port)
+            )
+            thr.setDaemon(True)
+            thr.start()
+
     def start(self):
         self.client.connect(
             hostname=self.hostname,
@@ -74,8 +84,7 @@ class SSHReverseTunnelForwarder:
             look_for_keys=False,
         )
         self.thread = threading.Thread(
-            target=reverse_forward_tunnel, args=(self, self.server_port, self.remote_host, self.remote_port,
-                                                 self.client.get_transport())
+            target=self.__th_reverse_tunnel__, args=()
         )
         self.thread.setDaemon(True)
         self.thread.start()
@@ -85,15 +94,18 @@ class SSHReverseTunnelForwarder:
         if not self.is_alive:
             raise Exception("Nothing to stop")
         self.is_alive = False
+        self.client.close()
 
 
 class Tunnel(SSHReverseTunnelForwarder):
     """
     SSHTunnelForwarder Wrapper to communicate with Boring Proxy API server.
     """
+
     def __init__(self, web_api: WebAPI, subdomain: str, ssh_key_id="", client_name="any", client_addr="127.0.0.1",
                  client_port=5555, allow_external_tcp=False, password_protect=False, username="", password="",
                  tls_termination="server", **kwargs):
+        client_port = int(client_port) if isinstance(client_port, str) else client_port
 
         self.__bp_web_api = web_api
         self.__subdomain__ = subdomain + '.' + web_api.admin_domain \
@@ -114,7 +126,7 @@ class Tunnel(SSHReverseTunnelForwarder):
                          port=tunnel_info["server_port"],
                          username=tunnel_info["username"],
                          pkey=ssh_pkey,
-                         server_port=int(tunnel_info["tunnel_port"]),
+                         server_port=tunnel_info["tunnel_port"],
                          remote_host=client_addr,
                          remote_port=client_port)
 
@@ -142,7 +154,7 @@ class Tunnel(SSHReverseTunnelForwarder):
                          port=tunnel_info["server_port"],
                          username=tunnel_info["username"],
                          pkey=ssh_pkey,
-                         server_port=int(tunnel_info["tunnel_port"]),
+                         server_port=tunnel_info["tunnel_port"],
                          remote_host=self.__client_addr__,
                          remote_port=self.__client_port__)
         super(Tunnel, self).start()

@@ -11,10 +11,10 @@ client_config.admin_domain = "tunnels.example.com"
 bp_client = Client(client_config)
 tunnel = bp_client.open_tunnel("test.tunnels.example.com",  # Bind address:port
                                client_addr="127.0.0.1",  # and register tunnel in bp server
-                               client_port="8080")
+                               client_port=8080)
 tunnel2 = bp_client.open_tunnel("test2.tunnels.example.com",  # Bind address:port
                                client_addr="127.0.0.1",  # and register tunnel in bp server
-                               client_port="8080")
+                               client_port=8080)
 
 tunnel.start()  # Open ssh tunnel and register it in bp server
 tunnel2.start()

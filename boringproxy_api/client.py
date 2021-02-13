@@ -36,6 +36,7 @@ class Client:
         Registers new tunnel and returns Tunnel object
         :return: Tunnel object
         """
+        client_port = int(client_port) if isinstance(client_port, str) else client_port
         tunnel = Tunnel(self.__bp_server_api__, subdomain, ssh_key_id, self.__config__.client_name,
                         client_addr, client_port,
                         allow_external_tcp, password_protect, username, password, tls_termination, **kwargs)
